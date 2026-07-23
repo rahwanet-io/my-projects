@@ -1,0 +1,132 @@
+class AlertService:
+    def send(self, message):
+        print("Alert:", message)
+
+
+class Account:
+    def __init__(self, owner, account_number, balance=0):
+        self.owner = owner
+        self.account_number = account_number
+        self.__balance = balance
+        self.observers = []
+        self.history = []      # Transaction history stack
+
+    @property
+    def balance(self):
+        return self.__balance
+
+    def subscribe(self, observer):
+        self.observers.append(observer)
+
+    def notify(self, message):
+        for observer in self.observers:
+            observer.update(message)
+
+    def deposit(self, amount):
+        if amount > 0:
+            self.__balance += amount
+            self.history.append(("deposit", amount))
+            self.notify(f"{amount} birr deposited")
+
+    def withdraw(self, amount):
+        if amount <= self.__balance:
+            self.__balance -= amount
+            self.history.append(("withdraw", amount))
+            self.notify(f"{amount} birr withdrawn")
+        else:
+            print("Insufficient balance")
+
+    def undo_last(self):
+        if self.history:
+            action, amount = self.history.pop()
+
+            if action == "deposit":
+                self.__balance -= amount
+            else:
+                self.__balance += amount
+
+            print("Last transaction undone")
+        else:
+            print("No transaction to undo")
+
+    def statement(self):
+        print(f"{self.owner}: {self.balance} birr")
+
+
+class SavingsAccount(Account):
+    def __init__(self, owner, account_number, balance, rate):
+        super().__init__(owner, account_number, balance)
+        self.rate = rate
+
+    def add_interest(self):
+        interest = self.balance * self.rate
+        self.deposit(interest)
+
+
+class CurrentAccount(Account):
+    def __init__(self, owner, account_number, balance, overdraft):
+        super().__init__(owner, account_number, balance)
+        self.overdraft = overdraft
+
+
+class SMSAlert:
+    def update(self, message):
+        print("SMS:", message)
+
+
+class AccountFactory:
+    @staticmethod
+    def create(kind, owner, number, balance):
+        if kind == "savings":
+            return SavingsAccount(owner, number, balance, 0.05)
+        elif kind == "current":
+            return CurrentAccount(owner, number, balance, 500)
+        else:
+            print("Unknown account type")
+
+
+# Account Registry
+class AccountRegistry:
+    def __init__(self):
+        self.accounts = {}
+
+    def add(self, account):
+        self.accounts[account.account_number] = account
+
+    def find(self, number):
+        return self.accounts.get(number)
+
+    def list_all(self):
+        for account in self.accounts.values():
+            account.statement()
+
+
+# Create accounts
+account1 = AccountFactory.create("savings", "Rahwi", "1001", 1000)
+account2 = AccountFactory.create("current", "Abel", "1002", 500)
+
+# Add SMS alerts
+sms = SMSAlert()
+account1.subscribe(sms)
+account2.subscribe(sms)
+
+# Create registry
+registry = AccountRegistry()
+registry.add(account1)
+registry.add(account2)
+
+# Transactions
+account1.deposit(200)
+account1.withdraw(100)
+account1.undo_last()
+
+account2.deposit(300)
+
+# Find account
+found = registry.find("1001")
+if found:
+    found.statement()
+
+# List all accounts
+print("\nAll Accounts:")
+registry.list_all()
